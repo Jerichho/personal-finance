@@ -6,16 +6,22 @@ import { auth, db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import useStore from '@/store/useStore';
 
 export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { setUser } = useStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+    setError('');
+
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
@@ -28,9 +34,19 @@ export default function Register() {
         transactions: []
       });
 
+      // Update user state
+      setUser(userCredential.user);
+      
+      // Set auth cookie
+      document.cookie = `auth=true; path=/`;
+      
+      // Redirect to dashboard
       router.push('/dashboard');
-    } catch (error) {
-      setError('Error creating account. Please try again.');
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      setError(error.message || 'Error creating account. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -106,9 +122,10 @@ export default function Register() {
           <div>
             <button
               type="submit"
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              disabled={isLoading}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Create Account
+              {isLoading ? 'Creating account...' : 'Create account'}
             </button>
           </div>
         </form>

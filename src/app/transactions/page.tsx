@@ -1,17 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import useStore from '@/store/useStore';
+import { motion, AnimatePresence } from 'framer-motion';
+import useNotificationStore from '@/store/useNotificationStore';
 
 interface Transaction {
   id: string;
-  date: string;
+  amount: number;
   description: string;
   category: string;
-  amount: number;
-  userId: string;
+  date: string;
+  type: 'income' | 'expense';
 }
 
 const categories = [
@@ -26,84 +28,85 @@ const categories = [
 
 export default function Transactions() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [filter, setFilter] = useState('all');
   const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const { user } = useStore();
+  const { addNotification } = useNotificationStore();
 
   // Form state
   const [newTransaction, setNewTransaction] = useState({
+    amount: '',
     description: '',
     category: '',
-    amount: '',
-    date: new Date().toISOString().split('T')[0]
+    type: 'expense' as 'income' | 'expense',
   });
 
   useEffect(() => {
-    const fetchTransactions = async () => {
-      if (!user) {
-        console.log('No user logged in, skipping fetch');
-        setIsLoading(false);
-        return;
-      }
-      
-      try {
-        console.log('Fetching transactions for user:', user.uid);
-        const transactionsRef = collection(db, 'transactions');
-        const q = query(transactionsRef, where('userId', '==', user.uid));
-        const querySnapshot = await getDocs(q);
-        const transactionsData = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Transaction[];
-        console.log('Fetched transactions:', transactionsData);
-        setTransactions(transactionsData);
-      } catch (error) {
-        console.error('Error fetching transactions:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchTransactions();
+    if (user) {
+      fetchTransactions();
+    }
   }, [user]);
 
-  const handleAddTransaction = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) {
-      console.error('No user logged in');
-      return;
+  const fetchTransactions = async () => {
+    try {
+      const transactionsRef = collection(db, 'transactions');
+      const q = query(
+        transactionsRef,
+        where('userId', '==', user?.uid),
+        orderBy('date', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      const transactionsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Transaction[];
+      setTransactions(transactionsData);
+    } catch (err) {
+      setError('Error fetching transactions');
+      console.error('Error fetching transactions:', err);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
 
     try {
-      console.log('Adding transaction with data:', {
-        ...newTransaction,
-        amount: parseFloat(newTransaction.amount),
-        userId: user.uid
-      });
-
       const transactionData = {
         ...newTransaction,
         amount: parseFloat(newTransaction.amount),
-        userId: user.uid
+        date: new Date().toISOString(),
+        userId: user.uid,
       };
 
       const docRef = await addDoc(collection(db, 'transactions'), transactionData);
-      console.log('Transaction added successfully with ID:', docRef.id);
-      
-      setTransactions(prev => [...prev, { id: docRef.id, ...transactionData }]);
-      setShowAddForm(false);
+      const newTransactionWithId = {
+        id: docRef.id,
+        ...transactionData,
+      };
+
+      setTransactions(prev => [newTransactionWithId, ...prev]);
       setNewTransaction({
+        amount: '',
         description: '',
         category: '',
-        amount: '',
-        date: new Date().toISOString().split('T')[0]
+        type: 'expense',
       });
-    } catch (error) {
-      console.error('Error adding transaction:', error);
-      alert('Error adding transaction. Please try again.');
+
+      // Show success notification
+      addNotification(
+        `Successfully added ${newTransaction.type === 'income' ? 'income' : 'expense'} of $${newTransaction.amount}`,
+        'success'
+      );
+    } catch (err) {
+      console.error('Error adding transaction:', err);
+      addNotification('Error adding transaction', 'error');
     }
   };
 
@@ -123,10 +126,18 @@ export default function Transactions() {
 
   const totalBalance = transactions.reduce((sum, transaction) => sum + transaction.amount, 0);
 
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-red-500 text-center p-4">
+        {error}
       </div>
     );
   }
@@ -181,81 +192,55 @@ export default function Transactions() {
       {showAddForm && (
         <div className="bg-white shadow rounded-lg p-6">
           <h2 className="text-lg font-medium mb-4">Add New Transaction</h2>
-          <form onSubmit={handleAddTransaction} className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-                  Description
-                </label>
-                <input
-                  type="text"
-                  id="description"
-                  value={newTransaction.description}
-                  onChange={(e) => setNewTransaction(prev => ({ ...prev, description: e.target.value }))}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-gray-900"
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="category" className="block text-sm font-medium text-gray-700">
-                  Category
-                </label>
-                <select
-                  id="category"
-                  value={newTransaction.category}
-                  onChange={(e) => setNewTransaction(prev => ({ ...prev, category: e.target.value }))}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-gray-900"
-                  required
-                >
-                  <option value="">Select a category</option>
-                  {categories.map(category => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="amount" className="block text-sm font-medium text-gray-700">
-                  Amount
-                </label>
-                <input
-                  type="number"
-                  id="amount"
-                  step="0.01"
-                  value={newTransaction.amount}
-                  onChange={(e) => setNewTransaction(prev => ({ ...prev, amount: e.target.value }))}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-gray-900"
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="date" className="block text-sm font-medium text-gray-700">
-                  Date
-                </label>
-                <input
-                  type="date"
-                  id="date"
-                  value={newTransaction.date}
-                  onChange={(e) => setNewTransaction(prev => ({ ...prev, date: e.target.value }))}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-gray-900"
-                  required
-                />
-              </div>
-            </div>
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setShowAddForm(false)}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Type</label>
+              <select
+                value={newTransaction.type}
+                onChange={(e) => setNewTransaction(prev => ({ ...prev, type: e.target.value as 'income' | 'expense' }))}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
               >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Add Transaction
-              </button>
+                <option value="expense">Expense</option>
+                <option value="income">Income</option>
+              </select>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Amount</label>
+              <input
+                type="number"
+                step="0.01"
+                required
+                value={newTransaction.amount}
+                onChange={(e) => setNewTransaction(prev => ({ ...prev, amount: e.target.value }))}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Description</label>
+              <input
+                type="text"
+                required
+                value={newTransaction.description}
+                onChange={(e) => setNewTransaction(prev => ({ ...prev, description: e.target.value }))}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Category</label>
+              <input
+                type="text"
+                required
+                value={newTransaction.category}
+                onChange={(e) => setNewTransaction(prev => ({ ...prev, category: e.target.value }))}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              Add Transaction
+            </button>
           </form>
         </div>
       )}
@@ -266,39 +251,34 @@ export default function Transactions() {
           <p className="text-gray-500">No transactions found. Add your first transaction to get started!</p>
         </div>
       ) : (
-        <div className="bg-white shadow rounded-lg overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+        <div className="bg-white shadow rounded-lg p-6">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Recent Transactions</h2>
+          <div className="space-y-4">
+            <AnimatePresence>
               {filteredTransactions.map((transaction) => (
-                <tr key={transaction.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {new Date(transaction.date).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {transaction.description}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800">
-                      {transaction.category}
-                    </span>
-                  </td>
-                  <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${
-                    transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    ${Math.abs(transaction.amount).toFixed(2)}
-                  </td>
-                </tr>
+                <motion.div
+                  key={transaction.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                >
+                  <div>
+                    <p className="font-medium text-gray-900">{transaction.description}</p>
+                    <p className="text-sm text-gray-500">{transaction.category}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className={`font-medium ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                      {transaction.type === 'income' ? '+' : '-'}${transaction.amount.toFixed(2)}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {new Date(transaction.date).toLocaleDateString()}
+                    </p>
+                  </div>
+                </motion.div>
               ))}
-            </tbody>
-          </table>
+            </AnimatePresence>
+          </div>
         </div>
       )}
     </div>

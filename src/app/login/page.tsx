@@ -31,7 +31,17 @@ export default function Login() {
       router.push('/dashboard');
     } catch (error: any) {
       console.error('Login error:', error);
-      setError(error.message || 'Invalid email or password');
+      let errorMessage = 'Invalid email or password';
+      
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email. Please register first.';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password. Please try again.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address. Please check your input.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

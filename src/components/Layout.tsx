@@ -3,6 +3,10 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import useStore from '@/store/useStore';
+import AICoachButton from './AICoachButton';
+import { useAuth } from '@/hooks/useAuth';
+import { NotificationContainer } from './Notification';
+import useNotificationStore from '@/store/useNotificationStore';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -10,12 +14,15 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const pathname = usePathname();
-  const { user, signOut } = useStore();
+  const { user } = useStore();
+  const { signOut } = useAuth();
+  const { notifications, removeNotification } = useNotificationStore();
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard' },
     { name: 'Transactions', href: '/transactions' },
     { name: 'Budget', href: '/budget' },
+    { name: 'AI Coach', href: '/ai-coach' },
   ];
 
   const isActive = (path: string) => pathname === path;
@@ -94,6 +101,15 @@ export default function Layout({ children }: LayoutProps) {
           </p>
         </div>
       </footer>
+
+      {/* AI Coach Button */}
+      {user && <AICoachButton />}
+
+      {/* Notifications */}
+      <NotificationContainer
+        notifications={notifications}
+        onClose={removeNotification}
+      />
     </div>
   );
 } 
