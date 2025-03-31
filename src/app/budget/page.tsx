@@ -40,9 +40,14 @@ export default function Budget() {
 
   useEffect(() => {
     const fetchBudgets = async () => {
-      if (!user) return;
+      if (!user) {
+        console.log('No user logged in, skipping fetch');
+        setIsLoading(false);
+        return;
+      }
       
       try {
+        console.log('Fetching budgets for user:', user.uid);
         const budgetsRef = collection(db, 'budgets');
         const q = query(budgetsRef, where('userId', '==', user.uid));
         const querySnapshot = await getDocs(q);
@@ -50,6 +55,7 @@ export default function Budget() {
           id: doc.id,
           ...doc.data()
         })) as Budget[];
+        console.log('Fetched budgets:', budgetsData);
         setBudgets(budgetsData);
       } catch (error) {
         console.error('Error fetching budgets:', error);
@@ -63,9 +69,19 @@ export default function Budget() {
 
   const handleAddBudget = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user) {
+      console.error('No user logged in');
+      return;
+    }
 
     try {
+      console.log('Adding budget with data:', {
+        ...newBudget,
+        amount: parseFloat(newBudget.amount),
+        spent: parseFloat(newBudget.spent),
+        userId: user.uid
+      });
+
       const budgetData = {
         ...newBudget,
         amount: parseFloat(newBudget.amount),
@@ -74,6 +90,8 @@ export default function Budget() {
       };
 
       const docRef = await addDoc(collection(db, 'budgets'), budgetData);
+      console.log('Budget added successfully with ID:', docRef.id);
+      
       setBudgets(prev => [...prev, { id: docRef.id, ...budgetData }]);
       setShowAddForm(false);
       setNewBudget({
@@ -83,6 +101,7 @@ export default function Budget() {
       });
     } catch (error) {
       console.error('Error adding budget:', error);
+      alert('Error adding budget. Please try again.');
     }
   };
 
@@ -200,7 +219,7 @@ export default function Budget() {
                   id="category"
                   value={newBudget.category}
                   onChange={(e) => setNewBudget(prev => ({ ...prev, category: e.target.value }))}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-gray-900"
                   required
                 >
                   <option value="">Select a category</option>
@@ -219,7 +238,7 @@ export default function Budget() {
                   step="0.01"
                   value={newBudget.amount}
                   onChange={(e) => setNewBudget(prev => ({ ...prev, amount: e.target.value }))}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-gray-900"
                   required
                 />
               </div>

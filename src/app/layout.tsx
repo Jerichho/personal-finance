@@ -6,8 +6,8 @@ import Layout from "@/components/Layout";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Personal Finance Tracker",
-  description: "Track your finances with AI-powered insights",
+  title: "FinanceTracker - Personal Finance Management",
+  description: "Track your expenses, manage your budget, and achieve your financial goals.",
 };
 
 export default function RootLayout({

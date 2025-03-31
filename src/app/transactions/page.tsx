@@ -43,9 +43,14 @@ export default function Transactions() {
 
   useEffect(() => {
     const fetchTransactions = async () => {
-      if (!user) return;
+      if (!user) {
+        console.log('No user logged in, skipping fetch');
+        setIsLoading(false);
+        return;
+      }
       
       try {
+        console.log('Fetching transactions for user:', user.uid);
         const transactionsRef = collection(db, 'transactions');
         const q = query(transactionsRef, where('userId', '==', user.uid));
         const querySnapshot = await getDocs(q);
@@ -53,6 +58,7 @@ export default function Transactions() {
           id: doc.id,
           ...doc.data()
         })) as Transaction[];
+        console.log('Fetched transactions:', transactionsData);
         setTransactions(transactionsData);
       } catch (error) {
         console.error('Error fetching transactions:', error);
@@ -66,9 +72,18 @@ export default function Transactions() {
 
   const handleAddTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user) {
+      console.error('No user logged in');
+      return;
+    }
 
     try {
+      console.log('Adding transaction with data:', {
+        ...newTransaction,
+        amount: parseFloat(newTransaction.amount),
+        userId: user.uid
+      });
+
       const transactionData = {
         ...newTransaction,
         amount: parseFloat(newTransaction.amount),
@@ -76,6 +91,8 @@ export default function Transactions() {
       };
 
       const docRef = await addDoc(collection(db, 'transactions'), transactionData);
+      console.log('Transaction added successfully with ID:', docRef.id);
+      
       setTransactions(prev => [...prev, { id: docRef.id, ...transactionData }]);
       setShowAddForm(false);
       setNewTransaction({
@@ -86,6 +103,7 @@ export default function Transactions() {
       });
     } catch (error) {
       console.error('Error adding transaction:', error);
+      alert('Error adding transaction. Please try again.');
     }
   };
 
@@ -174,7 +192,7 @@ export default function Transactions() {
                   id="description"
                   value={newTransaction.description}
                   onChange={(e) => setNewTransaction(prev => ({ ...prev, description: e.target.value }))}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-gray-900"
                   required
                 />
               </div>
@@ -186,7 +204,7 @@ export default function Transactions() {
                   id="category"
                   value={newTransaction.category}
                   onChange={(e) => setNewTransaction(prev => ({ ...prev, category: e.target.value }))}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-gray-900"
                   required
                 >
                   <option value="">Select a category</option>
@@ -205,7 +223,7 @@ export default function Transactions() {
                   step="0.01"
                   value={newTransaction.amount}
                   onChange={(e) => setNewTransaction(prev => ({ ...prev, amount: e.target.value }))}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-gray-900"
                   required
                 />
               </div>
@@ -218,7 +236,7 @@ export default function Transactions() {
                   id="date"
                   value={newTransaction.date}
                   onChange={(e) => setNewTransaction(prev => ({ ...prev, date: e.target.value }))}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-gray-900"
                   required
                 />
               </div>
