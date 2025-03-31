@@ -23,26 +23,6 @@ A modern personal finance management application that helps users track their sp
 - Charts: Recharts
 
 
-## Project Structure
-
-```
-src/
-├── app/                 # Next.js app directory
-├── components/         # Reusable UI components
-├── lib/               # Utility functions and configurations
-├── hooks/             # Custom React hooks
-├── store/             # Zustand store
-└── types/             # TypeScript type definitions
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
